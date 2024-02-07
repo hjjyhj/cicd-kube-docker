@@ -7,8 +7,8 @@ pipeline {
     }
 */
     environment {
-        registry = "johnkimm/vproappdock"
-        registryCredentials = "dockerhub"
+        registry = "kubeimran/vproappdock"
+        registryCredential = 'dockerhub'
     }
 
     stages{
@@ -72,38 +72,38 @@ pipeline {
             }
         }
 
-    }
-
-    stage('Build App Image') {
-        steps {
-            scrpit {
-                dockerImage = docker.build registry + ":V$BUILD_NUMBER"
-            }
-        }
-    }
-
-    stage('Upload Image') {
-        steps {
+        stage('Build App Image') {
+          steps {
             script {
-                docker.withRegistry('', registryCredentials) {
-                    dockerImage.push("V$BUILD_NUMBER")
-                    dockerImage.push('latest')
-                }
+              dockerImage = docker.build registry + ":V$BUILD_NUMBER"
+            }
+          }
+        }
+
+        stage('Upload Image'){
+          steps{
+            script {
+              docker.withRegistry('', registryCredential) {
+                dockerImage.push("V$BUILD_NUMBER")
+                dockerImage.push('latest')
+              }
+            }
+          }
+        }
+
+        stage('Remove Unused docker image') {
+          steps{
+            sh "docker rmi $registry:V$BUILD_NUMBER"
+          }
+        }
+
+        stage('Kubernetes Deploy') {
+          agent {label 'KOPS'}
+            steps {
+              sh "helm upgrade --install --force vprofile-stack helm/vprofilecharts --set appimage=${registry}:V${BUILD_NUMBER} --namespace prod"
             }
         }
     }
 
-    stage('Remove Unused docker image') {
-        steps {
-            sh "docker rmi $registry:V$BUILD_NUMBER"
-        }
-    }
-
-    stage('Kubernetes Deploy') {
-        agent {label 'KOPS'}
-        steps {
-            sh "helm upgrade --install --force vprofile-stack helm/vprofilecharts --set appimage=${registry}:V${BUILD_NUMBER} --namespace prod"
-        }
-    }
 
 }
